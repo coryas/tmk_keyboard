@@ -18,6 +18,8 @@
 
 static bool config_mode = false;
 static bool force_usb = false;
+static uint32_t last_activity_time = 0;
+static bool bt_sleep_mode = false;
 
 static void status_led(bool on)
 {
@@ -36,6 +38,17 @@ void rn42_task_init(void)
 #ifdef NKRO_ENABLE
     rn42_nkro_last = keyboard_nkro;
 #endif
+    last_activity_time = timer_read32();
+}
+
+void rn42_update_activity(void)
+{
+    last_activity_time = timer_read32();
+    // Wake up from sleep mode if currently sleeping
+    if (bt_sleep_mode && rn42_is_sleeping()) {
+        rn42_wake();
+        bt_sleep_mode = false;
+    }
 }
 
 void rn42_task(void)
@@ -100,6 +113,17 @@ void rn42_task(void)
     if (e > 1000) {
         /* every second */
         prev_timer += e/1000*1000;
+
+        /* Check for Bluetooth idle timeout */
+        uint32_t current_time = timer_read32();
+        if (!bt_sleep_mode && rn42_linked() && !rn42_is_sleeping()) {
+            if (current_time - last_activity_time > BT_AUTO_PAUSE_TIMEOUT) {
+                rn42_sleep();
+                bt_sleep_mode = true;
+                dprintf("Bluetooth entered sleep after %lu seconds idle\n", 
+                       (current_time - last_activity_time) / 1000);
+            }
+        }
 
         /* Low voltage alert */
         uint8_t bs = battery_status();

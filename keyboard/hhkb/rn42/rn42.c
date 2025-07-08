@@ -129,6 +129,43 @@ bool rn42_linked(void)
     return PINF&(1<<6);
 }
 
+static bool rn42_sleeping = false;
+
+void rn42_sleep(void)
+{
+    if (!rn42_sleeping && rn42_linked()) {
+        // Enter sniff mode with deep sleep to reduce power consumption
+        // SW,8320 enables deep sleep with 500ms interval (0x320*0.625ms)
+        rn42_send_command(PSTR("$$$"));  // Enter command mode
+        wait_ms(500);
+        rn42_send_command(PSTR("SW,8320\r\n"));  // Enable deep sleep
+        rn42_send_command(PSTR("---\r\n"));      // Exit command mode
+        rn42_sleeping = true;
+        print("Bluetooth entered sleep mode\n");
+    }
+}
+
+void rn42_wake(void)
+{
+    if (rn42_sleeping) {
+        // Wake up by sending a character (first char will be lost as per documentation)
+        rn42_putc(' ');
+        wait_ms(10);
+        // Disable deep sleep by setting normal sniff mode
+        rn42_send_command(PSTR("$$$"));  // Enter command mode
+        wait_ms(500);
+        rn42_send_command(PSTR("SW,0000\r\n"));  // Disable sniff mode
+        rn42_send_command(PSTR("---\r\n"));      // Exit command mode
+        rn42_sleeping = false;
+        print("Bluetooth woke up from sleep\n");
+    }
+}
+
+bool rn42_is_sleeping(void)
+{
+    return rn42_sleeping;
+}
+
 
 static uint8_t leds = 0;
 static uint8_t keyboard_leds(void) { return leds; }

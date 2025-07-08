@@ -10,5 +10,6 @@ bool rn42_nkro_last;
 
 void rn42_task_init(void);
 void rn42_task(void);
+void rn42_update_activity(void);
 
 #endif

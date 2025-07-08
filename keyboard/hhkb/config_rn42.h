@@ -53,6 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 /* power control of key switch board */
 #define HHKB_POWER_SAVING
 
+/* Bluetooth auto-pause configuration */
+#define BT_AUTO_PAUSE_TIMEOUT   30000  /* 30 seconds idle timeout in ms */
+#define BT_WAKE_KEY            KC_ENTER /* Key to wake up from sleep */
+
 /*
  * Hardware Serial(UART)
  *     Baud rate are calculated with round off(+0.5).
