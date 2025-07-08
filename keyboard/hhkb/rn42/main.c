@@ -111,16 +111,7 @@ int main(void)
 void hook_matrix_change(keyevent_t event) 
 {
     if (event.pressed) {
-        // Update activity on any key press
+        // Update activity on any key press (this will also wake from sleep)
         rn42_update_activity();
-        
-        // Check if the wake key (Enter) was pressed for explicit wake
-        if (rn42_is_sleeping()) {
-            // Get the keycode for this position
-            uint8_t keycode = keymap_key_to_keycode(0, event.key);
-            if (keycode == BT_WAKE_KEY) {
-                rn42_wake();
-            }
-        }
     }
 }

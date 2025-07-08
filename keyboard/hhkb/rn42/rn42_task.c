@@ -116,7 +116,7 @@ void rn42_task(void)
 
         /* Check for Bluetooth idle timeout */
         uint32_t current_time = timer_read32();
-        if (!bt_sleep_mode && rn42_linked() && !rn42_is_sleeping()) {
+        if (!bt_sleep_mode && rn42_linked()) {
             if (current_time - last_activity_time > BT_AUTO_PAUSE_TIMEOUT) {
                 rn42_sleep();
                 bt_sleep_mode = true;
