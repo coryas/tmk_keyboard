@@ -134,12 +134,25 @@ static bool rn42_sleeping = false;
 void rn42_sleep(void)
 {
     if (!rn42_sleeping && rn42_linked()) {
-        // Enter sniff mode with deep sleep to reduce power consumption
-        // SW,8320 enables deep sleep with 500ms interval (0x320*0.625ms)
-        rn42_send_command(PSTR("$$$"));  // Enter command mode
-        wait_ms(500);
-        rn42_send_command(PSTR("SW,8320\r\n"));  // Enable deep sleep
-        rn42_send_command(PSTR("---\r\n"));      // Exit command mode
+        print("Entering Bluetooth sleep mode...\n");
+        
+        // Properly enter command mode like the existing implementation
+        rn42_disconnect();
+        while (rn42_linked()) ;  // Wait for disconnection
+        
+        wait_ms(1100);  // Need sufficient time before entering command mode
+        SEND_COMMAND("$$$");
+        wait_ms(600);   // Wait for command mode response
+        rn42_print_response();
+        
+        // Set deep sleep mode - SW,8320 enables deep sleep with 500ms interval
+        const char *s = SEND_COMMAND("v\r\n");
+        if (strncmp("v", s, 1) != 0) SEND_COMMAND("+\r\n"); // local echo on
+        
+        SEND_COMMAND("SW,8320\r\n");  // Enable deep sleep
+        SEND_COMMAND("---\r\n");      // Exit command mode
+        
+        rn42_autoconnect();  // Re-enable auto connection
         rn42_sleeping = true;
         print("Bluetooth entered sleep mode\n");
     }
@@ -148,14 +161,29 @@ void rn42_sleep(void)
 void rn42_wake(void)
 {
     if (rn42_sleeping) {
+        print("Waking Bluetooth from sleep mode...\n");
+        
         // Wake up by sending a character (first char will be lost as per documentation)
         rn42_putc(' ');
-        wait_ms(10);
-        // Disable deep sleep by setting normal sniff mode
-        rn42_send_command(PSTR("$$$"));  // Enter command mode
-        wait_ms(500);
-        rn42_send_command(PSTR("SW,0000\r\n"));  // Disable sniff mode
-        rn42_send_command(PSTR("---\r\n"));      // Exit command mode
+        wait_ms(100);  // Give module time to wake up
+        
+        // Properly enter command mode to disable sleep
+        rn42_disconnect();
+        while (rn42_linked()) ;  // Wait for disconnection
+        
+        wait_ms(1100);  // Need sufficient time before entering command mode
+        SEND_COMMAND("$$$");
+        wait_ms(600);   // Wait for command mode response
+        rn42_print_response();
+        
+        // Disable deep sleep mode
+        const char *s = SEND_COMMAND("v\r\n");
+        if (strncmp("v", s, 1) != 0) SEND_COMMAND("+\r\n"); // local echo on
+        
+        SEND_COMMAND("SW,0000\r\n");  // Disable sniff mode
+        SEND_COMMAND("---\r\n");      // Exit command mode
+        
+        rn42_autoconnect();  // Re-enable auto connection
         rn42_sleeping = false;
         print("Bluetooth woke up from sleep\n");
     }
