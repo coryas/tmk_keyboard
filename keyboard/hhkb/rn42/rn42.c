@@ -1,4 +1,5 @@
 #include <avr/io.h>
+#include <stdio.h>
 #include "host.h"
 #include "host_driver.h"
 #include "serial.h"
@@ -130,6 +131,7 @@ bool rn42_linked(void)
 }
 
 static bool rn42_sleeping = false;
+static uint8_t saved_auto_connect_mode = BT_AUTO_CONNECT_MODE;
 
 void rn42_sleep(void)
 {
@@ -145,16 +147,17 @@ void rn42_sleep(void)
         wait_ms(600);   // Wait for command mode response
         rn42_print_response();
         
-        // Set deep sleep mode - SW,8320 enables deep sleep with 500ms interval
+        // Disable auto-connect before entering deep sleep
         const char *s = SEND_COMMAND("v\r\n");
         if (strncmp("v", s, 1) != 0) SEND_COMMAND("+\r\n"); // local echo on
         
+        SEND_COMMAND("SM,0\r\n");     // Disable auto-connect
         SEND_COMMAND("SW,8320\r\n");  // Enable deep sleep
         SEND_COMMAND("---\r\n");      // Exit command mode
         
         rn42_autoconnect();  // Re-enable auto connection
         rn42_sleeping = true;
-        print("Bluetooth entered sleep mode\n");
+        print("Bluetooth entered sleep mode with auto-connect disabled\n");
     }
 }
 
@@ -167,7 +170,7 @@ void rn42_wake(void)
         rn42_putc(' ');
         wait_ms(100);  // Give module time to wake up
         
-        // Properly enter command mode to disable sleep
+        // Properly enter command mode to disable sleep and restore auto-connect
         rn42_disconnect();
         while (rn42_linked()) ;  // Wait for disconnection
         
@@ -176,16 +179,23 @@ void rn42_wake(void)
         wait_ms(600);   // Wait for command mode response
         rn42_print_response();
         
-        // Disable deep sleep mode
+        // Restore auto-connect mode and disable deep sleep
         const char *s = SEND_COMMAND("v\r\n");
         if (strncmp("v", s, 1) != 0) SEND_COMMAND("+\r\n"); // local echo on
+        
+        // Restore the original auto-connect mode
+        char sm_cmd[16];
+        sprintf(sm_cmd, "SM,%u\r\n", saved_auto_connect_mode);
+        rn42_puts(sm_cmd);
+        wait_ms(500);
+        rn42_print_response();
         
         SEND_COMMAND("SW,0000\r\n");  // Disable sniff mode
         SEND_COMMAND("---\r\n");      // Exit command mode
         
         rn42_autoconnect();  // Re-enable auto connection
         rn42_sleeping = false;
-        print("Bluetooth woke up from sleep\n");
+        print("Bluetooth woke up with auto-connect restored\n");
     }
 }
 
