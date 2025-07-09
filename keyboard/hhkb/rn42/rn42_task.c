@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 #include "keycode.h"
@@ -197,7 +198,14 @@ static void init_rn42(void)
     SEND_COMMAND("SF,1\r\n");  // factory defaults
     SEND_COMMAND("S-,TmkBT\r\n");
     SEND_COMMAND("SS,Keyboard/Mouse\r\n");
-    SEND_COMMAND("SM,4\r\n");  // auto connect(DTR)
+    
+    // Send configurable auto connect mode
+    char sm_cmd[16];
+    sprintf(sm_cmd, "SM,%u\r\n", BT_AUTO_CONNECT_MODE);
+    rn42_puts(sm_cmd);
+    wait_ms(500);
+    rn42_print_response();
+    
     SEND_COMMAND("SW,8000\r\n");   // Sniff disable
     SEND_COMMAND("S~,6\r\n");   // HID profile
     SEND_COMMAND("SH,003C\r\n");   // combo device, out-report, 4-reconnect

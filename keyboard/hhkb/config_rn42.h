@@ -57,6 +57,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define BT_AUTO_PAUSE_TIMEOUT   30000  /* 30 seconds idle timeout in ms */
 #define BT_WAKE_KEY            KC_ENTER /* Key to wake up from sleep */
 
+/* Bluetooth auto-connect configuration for initial DFU deployment */
+/* 0: Manual mode (no auto-connect, best for power saving with auto-pause)
+ * 3: Auto Connect Master mode
+ * 4: Auto Connect DTR mode (original default, uses GPIO6 control)
+ * 5: Auto Connect ANY mode
+ * 6: Auto reconnect Pair mode
+ */
+#define BT_AUTO_CONNECT_MODE    0      /* Set to 0 to prevent auto-reconnect after sleep */
+
 /*
  * Hardware Serial(UART)
  *     Baud rate are calculated with round off(+0.5).
