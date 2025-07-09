@@ -155,7 +155,7 @@ void rn42_sleep(void)
         SEND_COMMAND("SW,8320\r\n");  // Enable deep sleep
         SEND_COMMAND("---\r\n");      // Exit command mode
         
-        rn42_autoconnect();  // Re-enable auto connection
+        // Do NOT re-enable auto connection - keep GPIO6 low to prevent reconnection
         rn42_sleeping = true;
         print("Bluetooth entered sleep mode with auto-connect disabled\n");
     }
