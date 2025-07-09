@@ -191,6 +191,7 @@ void rn42_wake(void)
         rn42_print_response();
         
         SEND_COMMAND("SW,0000\r\n");  // Disable sniff mode
+        SEND_COMMAND("R,1\r\n");      // Reboot to apply auto-connect mode changes
         SEND_COMMAND("---\r\n");      // Exit command mode
         
         rn42_autoconnect();  // Re-enable auto connection
