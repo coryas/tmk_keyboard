@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 #include <avr/pgmspace.h>
 #include <avr/eeprom.h>
 #include "keycode.h"
@@ -18,6 +19,8 @@
 
 static bool config_mode = false;
 static bool force_usb = false;
+static uint32_t last_activity_time = 0;
+static bool bt_sleep_mode = false;
 
 static void status_led(bool on)
 {
@@ -36,6 +39,17 @@ void rn42_task_init(void)
 #ifdef NKRO_ENABLE
     rn42_nkro_last = keyboard_nkro;
 #endif
+    last_activity_time = timer_read32();
+}
+
+void rn42_update_activity(void)
+{
+    last_activity_time = timer_read32();
+    // Wake up from sleep mode if currently sleeping
+    if (bt_sleep_mode && rn42_is_sleeping()) {
+        rn42_wake();
+        bt_sleep_mode = false;
+    }
 }
 
 void rn42_task(void)
@@ -100,6 +114,17 @@ void rn42_task(void)
     if (e > 1000) {
         /* every second */
         prev_timer += e/1000*1000;
+
+        /* Check for Bluetooth idle timeout */
+        uint32_t current_time = timer_read32();
+        if (!bt_sleep_mode && rn42_linked()) {
+            if (current_time - last_activity_time > BT_AUTO_PAUSE_TIMEOUT) {
+                rn42_sleep();
+                bt_sleep_mode = true;
+                dprintf("Bluetooth entered sleep after %lu seconds idle\n", 
+                       (current_time - last_activity_time) / 1000);
+            }
+        }
 
         /* Low voltage alert */
         uint8_t bs = battery_status();
@@ -173,7 +198,14 @@ static void init_rn42(void)
     SEND_COMMAND("SF,1\r\n");  // factory defaults
     SEND_COMMAND("S-,TmkBT\r\n");
     SEND_COMMAND("SS,Keyboard/Mouse\r\n");
-    SEND_COMMAND("SM,4\r\n");  // auto connect(DTR)
+    
+    // Send configurable auto connect mode
+    char sm_cmd[16];
+    sprintf(sm_cmd, "SM,%u\r\n", BT_AUTO_CONNECT_MODE);
+    rn42_puts(sm_cmd);
+    wait_ms(500);
+    rn42_print_response();
+    
     SEND_COMMAND("SW,8000\r\n");   // Sniff disable
     SEND_COMMAND("S~,6\r\n");   // HID profile
     SEND_COMMAND("SH,003C\r\n");   // combo device, out-report, 4-reconnect

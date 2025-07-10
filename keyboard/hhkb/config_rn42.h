@@ -53,6 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 /* power control of key switch board */
 #define HHKB_POWER_SAVING
 
+/* Bluetooth auto-pause configuration */
+#define BT_AUTO_PAUSE_TIMEOUT   1800000  /* 30 minutes idle timeout in ms */
+#define BT_WAKE_KEY            KC_ENTER /* Key to wake up from sleep */
+
+/* Bluetooth auto-connect configuration */
+/* 0: Manual mode (no auto-connect)
+ * 3: Auto Connect Master mode
+ * 4: Auto Connect DTR mode (original default, uses GPIO6 control)
+ * 5: Auto Connect ANY mode
+ * 6: Auto reconnect Pair mode
+ */
+#define BT_AUTO_CONNECT_MODE    6      /* Default auto-connect mode (restored after sleep) */
+
 /*
  * Hardware Serial(UART)
  *     Baud rate are calculated with round off(+0.5).

@@ -1,4 +1,6 @@
 #include <avr/io.h>
+#include <stdio.h>
+#include <string.h>
 #include "host.h"
 #include "host_driver.h"
 #include "serial.h"
@@ -127,6 +129,120 @@ bool rn42_linked(void)
     //   High:  Linked
     //   Low:   Connecting
     return PINF&(1<<6);
+}
+
+static bool rn42_sleeping = false;
+static char stored_remote_address[13] = {0}; // Store 12-char address + null terminator
+
+void rn42_sleep(void)
+{
+    if (!rn42_sleeping && rn42_linked()) {
+        print("Entering Bluetooth sleep mode...\n");
+        
+        // Store the currently connected remote device address
+        print("Storing connected device address...\n");
+        rn42_disconnect();
+        while (rn42_linked()) ;  // Wait for disconnection
+        
+        wait_ms(1100);  // Need sufficient time before entering command mode
+        SEND_COMMAND("$$$");
+        wait_ms(600);   // Wait for command mode response
+        rn42_print_response();
+        
+        const char *s = SEND_COMMAND("v\r\n");
+        if (strncmp("v", s, 1) != 0) SEND_COMMAND("+\r\n"); // local echo on
+        
+        // Get and store the remote device address
+        const char *addr = SEND_COMMAND("GR\r\n");
+        wait_ms(500);
+        rn42_print_response();
+        
+        // Parse and store the address (should be 12 hex characters)
+        if (strlen(addr) >= 12) {
+            strncpy(stored_remote_address, addr, 12);
+            stored_remote_address[12] = '\0';
+            print("Stored device address: ");
+            xprintf("%s\n", stored_remote_address);
+        } else {
+            // If we can't get the address, clear the stored one
+            stored_remote_address[0] = '\0';
+            print("Could not retrieve device address\n");
+        }
+        
+        // Clear remote address to prevent auto-reconnection
+        SEND_COMMAND("SR,Z\r\n");     // Remove remote address
+        SEND_COMMAND("SW,8320\r\n");  // Enable deep sleep
+        SEND_COMMAND("---\r\n");      // Exit command mode
+        
+        rn42_sleeping = true;
+        print("Bluetooth entered sleep mode\n");
+    }
+}
+
+void rn42_wake(void)
+{
+    if (rn42_sleeping) {
+        print("Waking Bluetooth from sleep mode...\n");
+        
+        // Wake up by sending a character (first char will be lost as per documentation)
+        rn42_putc(' ');
+        wait_ms(100);  // Give module time to wake up
+        
+        // Enter command mode to disable sleep
+        rn42_disconnect();
+        while (rn42_linked()) ;  // Wait for disconnection
+        
+        wait_ms(1100);  // Need sufficient time before entering command mode
+        SEND_COMMAND("$$$");
+        wait_ms(600);   // Wait for command mode response
+        rn42_print_response();
+        
+        const char *s = SEND_COMMAND("v\r\n");
+        if (strncmp("v", s, 1) != 0) SEND_COMMAND("+\r\n"); // local echo on
+        
+        SEND_COMMAND("SW,0000\r\n");  // Disable deep sleep mode
+        wait_ms(500);
+        rn42_print_response();
+        
+        // If we have a stored device address, connect to it
+        if (stored_remote_address[0] != '\0') {
+            print("Connecting to stored device: ");
+            xprintf("%s\n", stored_remote_address);
+            
+            // Set the remote address and connect
+            rn42_puts("SR,");
+            rn42_puts(stored_remote_address);
+            rn42_puts("\r\n");
+            wait_ms(500);
+            rn42_print_response();
+            
+            SEND_COMMAND("---\r\n");      // Exit command mode first
+            wait_ms(500);
+            
+            // Now try to connect
+            wait_ms(1100);
+            SEND_COMMAND("$$$");
+            wait_ms(600);
+            rn42_print_response();
+            
+            SEND_COMMAND("C\r\n");        // Connect to stored address
+            wait_ms(500);
+            rn42_print_response();
+            
+            SEND_COMMAND("---\r\n");      // Exit command mode
+        } else {
+            print("No stored device address, manual connection required\n");
+            SEND_COMMAND("---\r\n");      // Exit command mode
+        }
+        
+        rn42_sleeping = false;
+        print("Bluetooth woke up\n");
+    }
+}
+
+bool rn42_is_sleeping(void)
+{
+    return rn42_sleeping;
 }
 
 

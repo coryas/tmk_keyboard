@@ -11,9 +11,12 @@
 #include "keycode.h"
 #include "action.h"
 #include "action_util.h"
+#include "action_layer.h"
+#include "keymap.h"
 #include "wait.h"
 #include "suart.h"
 #include "suspend.h"
+#include "hook.h"
 
 static int8_t sendchar_func(uint8_t c)
 {
@@ -101,5 +104,14 @@ int main(void)
 #endif
 
         rn42_task();
+    }
+}
+
+/* Hook to track keyboard activity for Bluetooth auto-pause */
+void hook_matrix_change(keyevent_t event) 
+{
+    if (event.pressed) {
+        // Update activity on any key press (this will also wake from sleep)
+        rn42_update_activity();
     }
 }
