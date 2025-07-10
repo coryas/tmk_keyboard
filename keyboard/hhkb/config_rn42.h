@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define HHKB_POWER_SAVING
 
 /* Bluetooth auto-pause configuration */
-#define BT_AUTO_PAUSE_TIMEOUT   30000  /* 30 seconds idle timeout in ms */
+#define BT_AUTO_PAUSE_TIMEOUT   1800000  /* 30 minutes idle timeout in ms */
 #define BT_WAKE_KEY            KC_ENTER /* Key to wake up from sleep */
 
 /* Bluetooth auto-connect configuration */
