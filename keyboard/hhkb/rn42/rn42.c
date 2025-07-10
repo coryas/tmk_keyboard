@@ -162,8 +162,7 @@ void rn42_sleep(void)
             strncpy(stored_remote_address, addr, 12);
             stored_remote_address[12] = '\0';
             print("Stored device address: ");
-            print(stored_remote_address);
-            print("\n");
+            xprintf("%s\n", stored_remote_address);
         } else {
             // If we can't get the address, clear the stored one
             stored_remote_address[0] = '\0';
@@ -208,8 +207,7 @@ void rn42_wake(void)
         // If we have a stored device address, connect to it
         if (stored_remote_address[0] != '\0') {
             print("Connecting to stored device: ");
-            print(stored_remote_address);
-            print("\n");
+            xprintf("%s\n", stored_remote_address);
             
             // Set the remote address and connect
             rn42_puts("SR,");
