@@ -1,5 +1,6 @@
 #include <avr/io.h>
 #include <stdio.h>
+#include <string.h>
 #include "host.h"
 #include "host_driver.h"
 #include "serial.h"
@@ -131,14 +132,15 @@ bool rn42_linked(void)
 }
 
 static bool rn42_sleeping = false;
-static uint8_t saved_auto_connect_mode = BT_AUTO_CONNECT_MODE;
+static char stored_remote_address[13] = {0}; // Store 12-char address + null terminator
 
 void rn42_sleep(void)
 {
     if (!rn42_sleeping && rn42_linked()) {
         print("Entering Bluetooth sleep mode...\n");
         
-        // Properly enter command mode like the existing implementation
+        // Store the currently connected remote device address
+        print("Storing connected device address...\n");
         rn42_disconnect();
         while (rn42_linked()) ;  // Wait for disconnection
         
@@ -147,17 +149,34 @@ void rn42_sleep(void)
         wait_ms(600);   // Wait for command mode response
         rn42_print_response();
         
-        // Disable auto-connect before entering deep sleep
         const char *s = SEND_COMMAND("v\r\n");
         if (strncmp("v", s, 1) != 0) SEND_COMMAND("+\r\n"); // local echo on
         
-        SEND_COMMAND("SM,0\r\n");     // Disable auto-connect
+        // Get and store the remote device address
+        const char *addr = SEND_COMMAND("GR\r\n");
+        wait_ms(500);
+        rn42_print_response();
+        
+        // Parse and store the address (should be 12 hex characters)
+        if (strlen(addr) >= 12) {
+            strncpy(stored_remote_address, addr, 12);
+            stored_remote_address[12] = '\0';
+            print("Stored device address: ");
+            print(stored_remote_address);
+            print("\n");
+        } else {
+            // If we can't get the address, clear the stored one
+            stored_remote_address[0] = '\0';
+            print("Could not retrieve device address\n");
+        }
+        
+        // Clear remote address to prevent auto-reconnection
+        SEND_COMMAND("SR,Z\r\n");     // Remove remote address
         SEND_COMMAND("SW,8320\r\n");  // Enable deep sleep
         SEND_COMMAND("---\r\n");      // Exit command mode
         
-        // Do NOT re-enable auto connection - keep GPIO6 low to prevent reconnection
         rn42_sleeping = true;
-        print("Bluetooth entered sleep mode with auto-connect disabled\n");
+        print("Bluetooth entered sleep mode\n");
     }
 }
 
@@ -170,7 +189,7 @@ void rn42_wake(void)
         rn42_putc(' ');
         wait_ms(100);  // Give module time to wake up
         
-        // Properly enter command mode to disable sleep and restore auto-connect
+        // Enter command mode to disable sleep
         rn42_disconnect();
         while (rn42_linked()) ;  // Wait for disconnection
         
@@ -179,25 +198,47 @@ void rn42_wake(void)
         wait_ms(600);   // Wait for command mode response
         rn42_print_response();
         
-        // Restore auto-connect mode and disable deep sleep
         const char *s = SEND_COMMAND("v\r\n");
         if (strncmp("v", s, 1) != 0) SEND_COMMAND("+\r\n"); // local echo on
         
-        // Restore the original auto-connect mode
-        char sm_cmd[16];
-        sprintf(sm_cmd, "SM,%u\r\n", saved_auto_connect_mode);
-        rn42_puts(sm_cmd);
+        SEND_COMMAND("SW,0000\r\n");  // Disable deep sleep mode
         wait_ms(500);
         rn42_print_response();
         
-        SEND_COMMAND("SW,0000\r\n");  // Disable deep sleep mode
-        SEND_COMMAND("R,1\r\n");      // Reboot to apply auto-connect mode changes (same pattern as init_rn42)
-        SEND_COMMAND("---\r\n");      // Exit command mode
+        // If we have a stored device address, connect to it
+        if (stored_remote_address[0] != '\0') {
+            print("Connecting to stored device: ");
+            print(stored_remote_address);
+            print("\n");
+            
+            // Set the remote address and connect
+            rn42_puts("SR,");
+            rn42_puts(stored_remote_address);
+            rn42_puts("\r\n");
+            wait_ms(500);
+            rn42_print_response();
+            
+            SEND_COMMAND("---\r\n");      // Exit command mode first
+            wait_ms(500);
+            
+            // Now try to connect
+            wait_ms(1100);
+            SEND_COMMAND("$$$");
+            wait_ms(600);
+            rn42_print_response();
+            
+            SEND_COMMAND("C\r\n");        // Connect to stored address
+            wait_ms(500);
+            rn42_print_response();
+            
+            SEND_COMMAND("---\r\n");      // Exit command mode
+        } else {
+            print("No stored device address, manual connection required\n");
+            SEND_COMMAND("---\r\n");      // Exit command mode
+        }
         
-        wait_ms(1000);  // Wait for reboot to complete
-        rn42_autoconnect();  // Re-enable auto connection via GPIO6
         rn42_sleeping = false;
-        print("Bluetooth woke up with auto-connect restored\n");
+        print("Bluetooth woke up\n");
     }
 }
 
