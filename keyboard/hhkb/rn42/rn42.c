@@ -190,11 +190,12 @@ void rn42_wake(void)
         wait_ms(500);
         rn42_print_response();
         
-        SEND_COMMAND("SW,0000\r\n");  // Disable sniff mode
-        SEND_COMMAND("R,1\r\n");      // Reboot to apply auto-connect mode changes
+        SEND_COMMAND("SW,0000\r\n");  // Disable deep sleep mode
+        SEND_COMMAND("R,1\r\n");      // Reboot to apply auto-connect mode changes (same pattern as init_rn42)
         SEND_COMMAND("---\r\n");      // Exit command mode
         
-        rn42_autoconnect();  // Re-enable auto connection
+        wait_ms(1000);  // Wait for reboot to complete
+        rn42_autoconnect();  // Re-enable auto connection via GPIO6
         rn42_sleeping = false;
         print("Bluetooth woke up with auto-connect restored\n");
     }
