@@ -27,4 +27,13 @@ void rn42_print_response(void);
 #define SEND_STR(str)       rn42_send_str(PSTR(str))
 #define SEND_COMMAND(cmd)   rn42_send_command(PSTR(cmd))
 
+/* 추가 함수들 - Deep Sleep 및 멀티 디바이스 지원 */
+bool rn42_enter_cmd_mode(void);
+bool rn42_exit_cmd_mode(void);
+bool rn42_is_connected(void);
+bool rn42_enter_pairing_mode(void);
+bool rn42_exit_pairing_mode(void);
+bool rn42_get_remote_address(char* addr);
+bool rn42_connect_to_address(const char* addr);
+
 #endif

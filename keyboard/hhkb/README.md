@@ -12,6 +12,7 @@ See [this thread][AltController] in geekhack.org for details.
 
 ## Update
 * Bluetooth module RN-42 is supported.(2015/01)
+* Deep Sleep mode for extended battery life.(2025/01)
 
 
 ## Features
@@ -20,6 +21,7 @@ See [this thread][AltController] in geekhack.org for details.
 * Mouse keys
 * USB NKRO
 * Bluetooth(RN-42)
+* Deep Sleep mode (<50μA power consumption)
 
 See README of [tmk_keyboard] for more.
 

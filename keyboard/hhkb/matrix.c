@@ -30,11 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <avr/wdt.h>
 #include "suspend.h"
 #include "lufa.h"
+#include "power_management.h"
 
 
 // matrix power saving
 #define MATRIX_POWER_SAVE       10000
 static uint32_t matrix_last_modified = 0;
+
+// Deep Sleep 타이머 관리
+static uint16_t last_timer_read = 0;
+extern power_manager_t power_manager;
 
 // matrix state buffer(1:on, 0:off)
 static matrix_row_t *matrix;
@@ -66,6 +71,17 @@ uint8_t matrix_scan(void)
     tmp = matrix_prev;
     matrix_prev = matrix;
     matrix = tmp;
+
+    // Deep Sleep 타이머 업데이트
+    uint16_t current_timer = timer_read();
+    uint16_t delta_ms = TIMER_DIFF_16(current_timer, last_timer_read);
+    last_timer_read = current_timer;
+    
+    // 전원 관리자에 타이머 업데이트 전달 (Deep Sleep 상태가 아닐 때만)
+    // 단, delta_ms가 0이 아닐 때만 업데이트 (너무 빠른 호출 방지)
+    if (!power_mgr_is_sleeping(&power_manager) && delta_ms > 0) {
+        power_mgr_update_timer(&power_manager, delta_ms);
+    }
 
     // power on
     if (!KEY_POWER_STATE()) KEY_POWER_ON();
@@ -128,7 +144,10 @@ uint8_t matrix_scan(void)
             _delay_us(75);
 #endif
         }
-        if (matrix[row] ^ matrix_prev[row]) matrix_last_modified = timer_read32();
+        if (matrix[row] ^ matrix_prev[row]) {
+            matrix_last_modified = timer_read32();
+            // Deep Sleep 타이머 리셋은 main.c에서 처리
+        }
     }
     // power off
     if (KEY_POWER_STATE() &&

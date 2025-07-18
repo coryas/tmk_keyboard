@@ -2,6 +2,13 @@
  * HHKB Layout
  */
 #include "keymap_common.h"
+#include "power_management.h"
+#include "print.h"
+#include "avr/xprintf.h"
+#include "wait.h"
+
+/* Deep Sleep 관련 변수 */
+extern power_manager_t power_manager;
 
 
 #ifdef KEYMAP_SECTION_ENABLE
@@ -93,3 +100,12 @@ const action_t fn_actions[] PROGMEM = {
     [0]  = ACTION_LAYER_MOMENTARY(1),
 };
 #endif
+
+
+/*
+ * Hook 시스템은 작동하지 않으므로 사용하지 않음
+ */
+void hook_matrix_change(keyevent_t event)
+{
+    // Hook 시스템이 작동하지 않음
+}

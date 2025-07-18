@@ -16,8 +16,21 @@
 #include "command.h"
 #include "battery.h"
 
+#ifdef DEEP_SLEEP_ENABLE
+#include "power_management.h"
+extern power_manager_t power_manager;
+#endif
+
+#ifdef MULTI_DEVICE_ENABLE
+#include "multi_device.h"
+extern device_manager_t device_manager;
+#endif
+
 static bool config_mode = false;
 static bool force_usb = false;
+#ifdef MULTI_DEVICE_ENABLE
+static uint8_t sub_command = 0;
+#endif
 
 static void status_led(bool on)
 {
@@ -100,6 +113,11 @@ void rn42_task(void)
     if (e > 1000) {
         /* every second */
         prev_timer += e/1000*1000;
+        
+#ifdef DEEP_SLEEP_ENABLE
+        /* Power management timer is updated in matrix.c with actual elapsed time */
+        /* No need to update here to avoid double counting */
+#endif
 
         /* Low voltage alert */
         uint8_t bs = battery_status();
@@ -124,12 +142,18 @@ void rn42_task(void)
     }
 
 
-    /* Connection monitor */
-    if (!rn42_rts() && rn42_linked()) {
-        status_led(true);
-    } else {
-        status_led(false);
+    /* Connection monitor - Deep Sleep 상태에서는 LED 표시 안함 */
+#ifdef DEEP_SLEEP_ENABLE
+    if (!power_mgr_is_sleeping(&power_manager)) {
+#endif
+        if (!rn42_rts() && rn42_linked()) {
+            status_led(true);
+        } else {
+            status_led(false);
+        }
+#ifdef DEEP_SLEEP_ENABLE
     }
+#endif
 }
 
 
@@ -255,11 +279,17 @@ bool command_extra(uint8_t code)
             print("b:       battery voltage\n");
             print("Del:     enter/exit RN-42 config mode\n");
             print("Slck:    RN-42 initialize\n");
-#if 0
-            print("1-4:     restore link\n");
-            print("F1-F4:   store link\n");
-#endif
+#ifdef MULTI_DEVICE_ENABLE
+            print("1-4:     switch to device 1-4\n");
+            print("p:       pairing mode\n");
+            print("d:       delete device mode\n");
+#else
             print("p:       pairing\n");
+#endif
+#ifdef DEEP_SLEEP_ENABLE
+            print("s:       enter Deep Sleep\n");
+            print("w:       set Wake-up key\n");
+#endif
 
             if (config_mode) {
                 return true;
@@ -267,35 +297,63 @@ bool command_extra(uint8_t code)
                 print("u:       toggle Force USB mode\n");
                 return false;   // to display default command help
             }
+#ifdef MULTI_DEVICE_ENABLE
+        case KC_P:
+            sub_command = KC_P;
+            print("Pairing mode - press device number (1-4)\n");
+            return true;
+            
+        case KC_D:
+            sub_command = KC_D;
+            print("Delete mode - press device number (1-4)\n");
+            return true;
+            
+        case KC_1:
+        case KC_2:
+        case KC_3:
+        case KC_4:
+            {
+                uint8_t device = code - KC_1;
+                
+                if (sub_command == KC_P) {
+                    /* Pairing to specific slot */
+                    print("Pairing to slot "); phex(device); print("\n");
+                    device_mgr_pair_device(&device_manager, device);
+                    sub_command = 0;
+                } else if (sub_command == KC_D) {
+                    /* Delete specific slot */
+                    print("Deleting slot "); phex(device); print("\n");
+                    device_mgr_delete_device(&device_manager, device);
+                    sub_command = 0;
+                } else {
+                    /* Switch to device */
+                    print("Switching to device "); phex(device); print("\n");
+                    device_mgr_switch_device(&device_manager, device);
+                }
+            }
+            return true;
+#else
         case KC_P:
             pairing();
             return true;
-#if 0
-        /* Store link address to EEPROM */
-        case KC_F1:
-            store_link(RN42_LINK0);
+#endif
+
+#ifdef DEEP_SLEEP_ENABLE
+        case KC_S:
+            print("Manual Deep Sleep\n");
+            
+            /* 상태를 SLEEP_PENDING으로 설정하여 즉시 진입 가능하게 함 */
+            power_manager.current_state = POWER_STATE_SLEEP_PENDING;
+            power_manager.idle_timer = 0;
+            
+            /* Deep Sleep 진입 */
+            power_mgr_enter_sleep(&power_manager);
             return true;
-        case KC_F2:
-            store_link(RN42_LINK1);
-            return true;
-        case KC_F3:
-            store_link(RN42_LINK2);
-            return true;
-        case KC_F4:
-            store_link(RN42_LINK3);
-            return true;
-        /* Restore link address to EEPROM */
-        case KC_1:
-            restore_link(RN42_LINK0);
-            return true;
-        case KC_2:
-            restore_link(RN42_LINK1);
-            return true;
-        case KC_3:
-            restore_link(RN42_LINK2);
-            return true;
-        case KC_4:
-            restore_link(RN42_LINK3);
+            
+            
+        case KC_W:
+            print("Setting Wake-up key\n");
+            /* TODO: Wake-up key setting */
             return true;
 #endif
         case KC_I:
@@ -329,11 +387,37 @@ bool command_extra(uint8_t code)
             uint8_t m = t%3600/60;
             uint8_t s = t%60;
             xprintf("uptime: %02u %02u:%02u:%02u\n", d, h, m, s);
-#if 0
-            xprintf("LINK0: %s\r\n", get_link(RN42_LINK0));
-            xprintf("LINK1: %s\r\n", get_link(RN42_LINK1));
-            xprintf("LINK2: %s\r\n", get_link(RN42_LINK2));
-            xprintf("LINK3: %s\r\n", get_link(RN42_LINK3));
+            
+#ifdef DEEP_SLEEP_ENABLE
+            print("\n----- Deep Sleep info -----\n");
+            xprintf("Sleep state: ");
+            if (power_mgr_is_sleeping(&power_manager)) {
+                xprintf("SLEEPING\n");
+            } else {
+                xprintf("ACTIVE\n");
+            }
+            xprintf("Idle time: %lu sec\n", power_mgr_get_idle_time(&power_manager) / 1000);
+#endif
+
+#ifdef MULTI_DEVICE_ENABLE
+            print("\n----- Multi Device info -----\n");
+            xprintf("Active device: %d\n", device_mgr_get_active_device(&device_manager));
+            xprintf("Device count: %d\n", device_mgr_get_device_count(&device_manager));
+            xprintf("Connected: ");
+            if (device_mgr_is_connected(&device_manager)) {
+                xprintf("YES\n");
+            } else {
+                xprintf("NO\n");
+            }
+            for (uint8_t i = 0; i < MAX_DEVICES; i++) {
+                if (!device_mgr_is_slot_empty(&device_manager, i)) {
+                    xprintf("Slot %d: ", i);
+                    xputs(device_manager.config.devices[i].device_name);
+                    xprintf(" (");
+                    xputs(device_manager.config.devices[i].mac_address_str);
+                    xprintf(")\n");
+                }
+            }
 #endif
             return true;
         case KC_B:

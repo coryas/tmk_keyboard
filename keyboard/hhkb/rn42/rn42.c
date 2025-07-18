@@ -1,4 +1,6 @@
 #include <avr/io.h>
+#include <avr/pgmspace.h>
+#include <string.h>
 #include "host.h"
 #include "host_driver.h"
 #include "serial.h"
@@ -263,3 +265,78 @@ static void config_send_keyboard(report_keyboard_t *report) {}
 static void config_send_mouse(report_mouse_t *report) {}
 static void config_send_system(uint16_t data) {}
 static void config_send_consumer(uint16_t data) {}
+
+/* 추가 함수 구현 - Deep Sleep 및 멀티 디바이스 지원 */
+
+bool rn42_enter_cmd_mode(void) {
+    // Deep Sleep 구현에서는 RN-42 명령 모드 진입 비활성화
+    print("RN42 command mode disabled for Deep Sleep implementation\n");
+    return false;
+}
+
+bool rn42_exit_cmd_mode(void) {
+    // ---를 전송하여 명령 모드 종료
+    SEND_STR("---\r\n");
+    wait_ms(100);
+    const char* response = rn42_gets(500);
+    return (response && strstr(response, "END"));
+}
+
+bool rn42_is_connected(void) {
+    return rn42_linked();
+}
+
+bool rn42_enter_pairing_mode(void) {
+    if (!rn42_enter_cmd_mode()) return false;
+    
+    // 검색 가능하게 설정
+    SEND_STR("SI,0200\r\n");  // Inquiry scan interval
+    wait_ms(100);
+    SEND_STR("SJ,0200\r\n");  // Page scan interval
+    wait_ms(100);
+    SEND_STR("I,60\r\n");     // 60초간 검색 가능
+    wait_ms(100);
+    
+    return rn42_exit_cmd_mode();
+}
+
+bool rn42_exit_pairing_mode(void) {
+    // 검색 불가능하게 설정
+    if (!rn42_enter_cmd_mode()) return false;
+    SEND_STR("Q,0\r\n");  // Quiet mode
+    wait_ms(100);
+    return rn42_exit_cmd_mode();
+}
+
+bool rn42_get_remote_address(char* addr) {
+    if (!rn42_enter_cmd_mode()) return false;
+    
+    SEND_STR("GR\r\n");
+    const char* response = rn42_gets(1000);
+    
+    if (response && strlen(response) >= 17) {
+        // MAC 주소 형식: XX:XX:XX:XX:XX:XX
+        strncpy(addr, response, 17);
+        addr[17] = '\0';
+        rn42_exit_cmd_mode();
+        return true;
+    }
+    
+    rn42_exit_cmd_mode();
+    return false;
+}
+
+bool rn42_connect_to_address(const char* addr) {
+    if (!rn42_enter_cmd_mode()) return false;
+    
+    // 연결 명령 전송
+    rn42_send_str("C,");
+    rn42_send_str(addr);
+    rn42_send_str("\r\n");
+    
+    // 연결 응답 대기 (최대 5초)
+    const char* response = rn42_gets(5000);
+    
+    rn42_exit_cmd_mode();
+    return (response && strstr(response, "CONNECT"));
+}
