@@ -72,6 +72,12 @@ bool matrix_has_ghost_in_row(uint8_t row);
 void matrix_power_up(void);
 void matrix_power_down(void);
 
+/* Deep Sleep optimization - scan only Enter key */
+bool matrix_scan_enter_key(void);
+
+/* Deep Sleep optimization - scan for any key press */
+bool matrix_scan_any_key(void);
+
 #ifdef __cplusplus
 }
 #endif

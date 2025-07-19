@@ -172,3 +172,79 @@ void matrix_power_up(void) {
 void matrix_power_down(void) {
     KEY_POWER_OFF();
 }
+
+/* Deep Sleep 전용 - Enter 키만 빠르게 스캔 */
+bool matrix_scan_enter_key(void)
+{
+    // 키보드 전원 켜기
+    if (!KEY_POWER_STATE()) {
+        KEY_POWER_ON();
+    }
+    
+    // 안정화 대기
+    _delay_us(10);
+    
+    // Row 5, Col 3 선택 (Enter 키)
+    KEY_SELECT(5, 3);
+    _delay_us(10);
+    
+    // 이전 키 상태에 따른 히스테리시스 설정
+    // Deep Sleep에서는 단순하게 처리
+    KEY_PREV_OFF();  // 기본적으로 OFF로 설정
+    _delay_us(10);
+    
+    // 키 활성화
+    KEY_ENABLE();
+    
+    // 키 상태 읽기 전 안정화 대기
+    _delay_us(10);
+    
+    // Enter 키 상태 읽기 (0 = pressed, 1 = not pressed)
+    bool enter_pressed = !KEY_STATE();
+    
+    // 추가 안정화 대기
+    _delay_us(75);
+    
+    // 키보드 상태 정리
+    KEY_UNABLE();
+    KEY_PREV_OFF();
+    
+    // 전원은 켜둔 상태로 유지 (다음 스캔을 위해)
+    
+    return enter_pressed;
+}
+
+/* Deep Sleep 전용 - 아무 키나 눌렸는지 확인 */
+bool matrix_scan_any_key(void)
+{
+    // 키보드 전원 켜기
+    if (!KEY_POWER_STATE()) {
+        KEY_POWER_ON();
+    }
+    
+    // 모든 행을 빠르게 스캔
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            KEY_SELECT(row, col);
+            _delay_us(5);
+            
+            KEY_PREV_OFF();
+            _delay_us(5);
+            
+            KEY_ENABLE();
+            _delay_us(5);
+            
+            // 키가 눌렸는지 확인
+            if (!KEY_STATE()) {
+                KEY_UNABLE();
+                KEY_PREV_OFF();
+                return true;  // 키가 눌림
+            }
+            
+            KEY_UNABLE();
+            _delay_us(5);
+        }
+    }
+    
+    return false;  // 아무 키도 눌리지 않음
+}

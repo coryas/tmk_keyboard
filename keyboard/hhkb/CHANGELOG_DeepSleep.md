@@ -1,5 +1,120 @@
 # HHKB Deep Sleep 기능 변경 이력
 
+## [2.3.1] - 2025-01-19
+
+### 수정됨
+- Enter 키 Wake-up 문제 재수정
+  - CPU 클럭 16MHz 유지 (매트릭스 스캔 타이밍 호환성)
+  - WDT 로직 흐름 개선
+  - 디버깅 LED 표시 추가
+
+### 개선됨
+- WDT Power-down 모드에서 Enter 키 체크 로직 수정
+- 키 체크 요청 시에만 Enter 키 스캔 실행
+
+### 기술적 세부사항
+- CPU 클럭 감소 다시 비활성화 (타이밍 문제)
+- WDT 진입 시 LED 확인 표시 (2회 깜빡임)
+- Enter 키 상태에 따른 LED 표시 유지
+
+## [2.3.0] - 2025-01-19
+
+### 추가됨
+- Phase 2: WDT(Watchdog Timer) 기반 Power-down 모드 구현
+  - ATmega32U4의 Power-down 모드 사용으로 전력 소비 대폭 감소
+  - WDT 인터럽트로 주기적 Wake-up (125ms 간격)
+  - CPU는 대부분 Sleep 상태 유지
+- CPU 클럭 감소 재활성화 (16MHz → 1MHz)
+  - WDT 사용으로 타이밍 문제 해결
+
+### 개선됨
+- 예상 전력 소비: ~50μA (이전: >1mA)
+  - CPU Power-down: 95% 시간 동안 Sleep
+  - CPU 클럭 1MHz: 추가 80% 전력 절약
+  - 매트릭스 스캔 최적화: 10배 감소
+- Enter 키만으로 Wake-up (디버그 모드 비활성화)
+
+### 기술적 세부사항
+- wdt_power.h/c: WDT 기반 전력 관리 모듈 추가
+- main.c: WDT Power-down 통합
+- power_management.c: CPU 클럭 감소 재활성화
+- 매트릭스 스캔은 WDT 인터럽트 시에만 실행
+
+## [2.2.3] - 2025-01-19
+
+### 수정됨
+- Magic + S로 Deep Sleep 진입 시 즉시 Wake-up되는 문제 수정
+- Deep Sleep 진입 시 키 상태 초기화 추가
+- Deep Sleep 진입 직후 키 무시 시간 증가 (3회 → 10회, 약 1초)
+- 디버그 모드에서도 초기 키 변화 무시
+
+### 개선됨
+- Magic + S 키 릴리즈 대기 시간 추가 (300ms)
+- Deep Sleep 진입 시 clear_keys() 호출로 깨끗한 상태 보장
+- 더 안정적인 Deep Sleep 진입 및 유지
+
+### 기술적 세부사항
+- power_management.c: Deep Sleep 진입 시 clear_keys() 추가
+- main.c: Deep Sleep 초기화 시 300ms 대기 및 키 상태 클리어
+- deep_sleep_init_count를 10으로 증가하여 약 1초간 키 무시
+
+## [2.2.2] - 2025-01-19
+
+### 수정됨
+- Enter 키 Wake-up 문제 추가 디버깅 및 수정
+- 매트릭스 스캔 타이밍 개선
+- 히스테리시스 설정 순서 수정
+- Wake-up 감지 로직 개선 (눌림/떼어짐 모두 감지)
+
+### 추가됨
+- 디버그 모드: 아무 키나 Wake-up 가능 (DEBUG_ANY_KEY_WAKEUP)
+- LED 디버깅 기능 강화
+- matrix_scan_any_key() 함수 추가
+- 키 상태 변화 감지 시 디바운싱 추가
+
+### 개선됨
+- Deep Sleep 진입 시 초기 Enter 키 상태 정확히 읽기
+- 키보드 전원 상태 확인 후 켜기
+- 타이밍 지연 최적화
+
+## [2.2.1] - 2025-01-19
+
+### 수정됨
+- Enter 키 Wake-up 문제 해결
+- CPU 클럭 감소 기능 일시적으로 비활성화 (타이밍 문제로 인해)
+- `_delay_us()` 및 `_delay_ms()` 함수가 CPU 클럭에 의존적인 문제 발견
+
+### 문제 분석
+- CPU 클럭이 16MHz에서 1MHz로 감소할 때 모든 지연 함수가 16배 느려짐
+- `KEY_POWER_ON()` 내부의 `_delay_ms(5)`가 실제로 80ms 지연 발생
+- 100ms 스캔 주기 내에서 Enter 키를 제대로 감지할 수 없음
+
+### 해결 방법
+- Phase 1에서는 CPU 클럭을 16MHz로 유지
+- 매트릭스 스캔 최적화만으로 전력 절약 (약 90%)
+- Phase 2에서 WDT 기반 Power-down 모드로 더 많은 전력 절약 예정
+
+## [2.2.0] - 2025-01-19
+
+### 추가됨
+- Phase 1 전력 최적화 구현
+  - 매트릭스 스캔 주기 최적화: 10ms → 100ms (Deep Sleep 상태에서)
+  - Enter 키 전용 스캔 함수 `matrix_scan_enter_key()` 추가
+  - CPU 클럭 동적 조절: 16MHz → 1MHz (Deep Sleep 상태에서)
+
+### 개선됨
+- Deep Sleep 상태에서 전력 소비 대폭 감소
+  - 매트릭스 스캔으로 인한 전력 소비 90% 감소
+  - CPU 클럭 감소로 추가 80% 전력 절약
+  - 예상 총 전력 절약: ~85-90%
+
+### 기술적 세부사항
+- matrix.c에 `matrix_scan_enter_key()` 함수 추가
+- power_management.c에 CPU 클럭 프리스케일러 설정 추가
+  - `prepare_sleep()`: CLKPR을 사용하여 16분주 (1MHz)
+  - `handle_wakeup()`: 클럭을 16MHz로 복원
+- main.c에서 Deep Sleep 상태 시 최적화된 스캔 사용
+
 ## [2.1.16] - 2025-01-18
 
 ### 변경됨

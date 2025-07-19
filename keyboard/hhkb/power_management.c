@@ -18,6 +18,7 @@
 #include <avr/sleep.h>
 #include <avr/power.h>
 #include <avr/interrupt.h>
+#include <avr/wdt.h>
 
 /* 전역 전원 관리자 인스턴스 */
 power_manager_t power_manager;
@@ -159,6 +160,9 @@ void power_mgr_enter_sleep(power_manager_t* mgr) {
     /* Sleep 준비 */
     power_mgr_prepare_sleep(mgr);
     
+    /* 키 상태 초기화 - Deep Sleep 진입 시 깨끗한 상태 보장 */
+    clear_keys();
+    
     /* 상태 변경 */
     mgr->current_state = POWER_STATE_DEEP_SLEEP;
     mgr->idle_timer = 0;  /* 타이머 리셋 */
@@ -282,6 +286,14 @@ static void power_mgr_prepare_sleep(power_manager_t* mgr) {
     
     /* 매트릭스 스캔을 위한 타이머 유지 */
     /* Timer0은 매트릭스 스캔을 위해 유지 */
+    
+    /* Phase 2: WDT 기반이지만 매트릭스 스캔 타이밍을 위해 CPU 클럭 유지 */
+    /* CPU 클럭 감소는 매트릭스 스캔과 호환되지 않음 */
+    /* TODO: Phase 3에서 다른 방법으로 전력 절약 */
+    // CLKPR = (1 << CLKPCE);  /* 클럭 프리스케일러 변경 활성화 */
+    // CLKPR = (1 << CLKPS2);  /* 16분주 = 16MHz / 16 = 1MHz */
+    
+    POWER_LOG("CPU clock maintained at 16MHz for matrix scan timing\n");
 }
 
 /* Sleep 실행 */
@@ -298,6 +310,12 @@ static void power_mgr_execute_sleep(void) {
 
 /* Wake-up 후 처리 */
 static void power_mgr_handle_wakeup(power_manager_t* mgr) {
+    /* CPU 클럭은 변경하지 않았으므로 복원 불필요 */
+    // CLKPR = (1 << CLKPCE);  /* 클럭 프리스케일러 변경 활성화 */
+    // CLKPR = 0;              /* 분주 비활성화 = 16MHz */
+    
+    POWER_LOG("CPU clock already at 16MHz\n");
+    
     /* 주변장치 재활성화 */
     power_all_enable();
     

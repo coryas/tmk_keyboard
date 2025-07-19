@@ -8,7 +8,8 @@ SRC +=  serial_uart.c \
 	rn42/main.c \
 	rn42/rn42_sleep.c \
 	power_management.c \
-	multi_device.c
+	multi_device.c \
+	wdt_power.c
 
 OPT_DEFS += -DPROTOCOL_RN42
 

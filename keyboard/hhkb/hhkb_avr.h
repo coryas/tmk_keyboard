@@ -90,6 +90,10 @@ static inline void KEY_SELECT(uint8_t ROW, uint8_t COL)
 #endif
 }
 
+/* Deep Sleep optimization macros */
+#define KEY_SELECT_ROW(ROW) (PORTB = (PORTB & 0xF8) | ((ROW) & 0x07))
+#define KEY_SELECT_COL(COL) (PORTB = (PORTB & 0xC7) | (((COL) & 0x07)<<3))
+
 
 #elif defined(__AVR_AT90USB1286__)
 /*
